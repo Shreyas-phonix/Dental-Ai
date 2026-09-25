@@ -1,0 +1,27 @@
+# ML configuration
+
+model:
+  name: tooth_age_regressor
+  input_size: [224, 224]
+  channels: 3
+  output_dim: 1
+
+training:
+  seed: 42
+  epochs: 8
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  patience: 3
+  loss: mae
+  optimizer: adam
+
+inference:
+  device: cpu
+  confidence: false
+  uncertainty: false
+
+paths:
+  weights_dir: ml/weights
+  default_model: ml/weights/best_model.pth
+  dataset_dir: dataset

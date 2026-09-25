@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #f3f7fb;
+  --panel: #ffffff;
+  --panel-alt: #edf4ff;
+  --brand: #0d5fd7;
+  --brand-strong: #083c8d;
+  --text: #15233d;
+  --muted: #5d708a;
+  --border: rgba(21, 35, 61, 0.08);
+  --success: #2d8a5d;
+  --warning: #d78a1a;
+  --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+  color: var(--text);
+}
+
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+button, input { font: inherit; }
+
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  background: rgba(255,255,255,0.8);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.brand-group { display: flex; align-items: center; gap: 14px; }
+.brand-mark {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: grid; place-items: center; font-weight: 800; color: white; background: linear-gradient(135deg, var(--brand), #60a5fa);
+}
+.brand-name { font-weight: 800; font-size: 1.1rem; }
+.brand-subtitle { color: var(--muted); font-size: 0.74rem; }
+.nav-links { display: flex; gap: 20px; color: var(--muted); }
+
+.hero {
+  display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 32px;
+  margin-top: 34px;
+  align-items: center;
+}
+
+.hero-panel, .panel {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--shadow);
+}
+.hero-panel { padding: 28px; }
+.hero-kicker { color: var(--brand); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.72rem; }
+.hero h1 { font-size: clamp(2.3rem, 3vw, 4rem); line-height: 1.02; margin: 10px 0 16px; }
+.hero p { color: var(--muted); line-height: 1.7; }
+
+.primary-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 18px; border: none; border-radius: 12px; background: linear-gradient(135deg, var(--brand), #4f8af8); color: white; font-weight: 700; cursor: pointer; box-shadow: 0 12px 24px rgba(13,95,215,0.2);
+}
+.secondary-button { display: inline-flex; ... }
+
+.preview-card {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-radius: 20px; min-height: 220px; display: grid; place-items: center; color: white; overflow: hidden;
+}
+.preview-image, .heatmap-image { width: 100%; height: auto; object-fit: cover; }
+
+.section-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 32px; }
+.info-card { padding: 20px; }
+.info-card h3 { margin-top: 0; }
+
+.analyze-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px; }
+.upload-box {
+  border: 2px dashed rgba(13,95,215,0.25); border-radius: 24px; background: rgba(236,246,255,0.7); padding: 40px 20px; text-align: center; min-height: 260px; display: grid; place-items: center; transition: 0.2s ease;
+}
+.upload-box.dragging { background: rgba(203,233,255,0.9); transform: translateY(-2px); }
+.upload-title { font-size: 1.35rem; font-weight: 700; }
+.upload-subtitle { color: var(--muted); margin: 8px 0 18px; }
+
+.panel { padding: 20px; }
+.metric-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(21,35,61,0.06); }
+.disclaimer-box {
+  margin-top: 16px; border-radius: 14px; background: #fff4d6; color: #8d5d15; padding: 14px; line-height: 1.6;
+}
+
+.table-panel table { width: 100%; border-collapse: collapse; }
+.table-panel th, .table-panel td { text-align: left; padding: 12px; border-bottom: 1px solid rgba(21,35,61,0.06); }
+
+@media (max-width: 900px) {
+  .hero, .analyze-layout, .section-grid { grid-template-columns: 1fr; }
+  .navbar { flex-direction: column; gap: 12px; }
+  .nav-links { flex-wrap: wrap; justify-content: center; }
+}

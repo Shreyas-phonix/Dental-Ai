@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.backend
+    environment:
+      MODEL_PATH: /app/ml/weights/best_model.pth
+      DATABASE_URL: sqlite:////app/backend/dental_ai.db
+      UPLOAD_DIR: /app/backend/uploads
+      RESULT_DIR: /app/backend/results
+      MAX_UPLOAD_SIZE: 20971520
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dental_ai
+      POSTGRES_USER: dentalai
+      POSTGRES_PASSWORD: dentalai
+    ports:
+      - "5432:5432"

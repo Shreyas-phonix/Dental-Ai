@@ -1,0 +1,20 @@
+# .gitignore
+
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/uploads/*
+backend/results/*
+backend/logs/*
+ml/weights/*.pth
+ml/weights/*.pt
+.DS_Store
+coverage/
+.pytest_cache/
+*.sqlite3
+*.db

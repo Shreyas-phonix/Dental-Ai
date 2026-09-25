@@ -1,0 +1,1 @@
+from .dental_age_model import TinyDentalRegressor
