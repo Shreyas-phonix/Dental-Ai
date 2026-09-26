@@ -10,6 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     app_name: str = "DentalAge AI"
+    # Paths resolved relative to the repository root for robust local development
     model_path: str = str(ROOT_DIR / "ml" / "weights" / "best_model.pth")
     database_url: str = f"sqlite:///{ROOT_DIR / 'backend' / 'dental_ai.db'}"
     upload_dir: str = str(ROOT_DIR / "backend" / "uploads")
