@@ -1,164 +1,139 @@
-from __future__ import annotations
+import { useEffect, useState } from 'react';
+import {
+  Navbar,
+  UploadBox,
+  XrayPreview,
+  PredictionCard,
+  HeatmapViewer,
+  HistoryTable,
+} from './components/ui';
+import { analyzeImage, fetchHistory, type HistoryItem, type PredictionResult } from './services/api';
 
-import uuid
-from datetime import datetime, timezone
-from pathlib import Path
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+export default function App() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [result, setResult] = useState<PredictionResult | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-from backend.config import settings
-from backend.database.db import initialize_db
-from backend.services.analysis_store import delete_analysis, get_analysis_by_id, list_history, record_analysis, save_upload
-from backend.services.file_validation import is_supported_image_extension, is_valid_image
-from ml.inference.inference import DentalAgePredictor, ensure_model_exists
+  useEffect(() => {
+    fetchHistory().then(setHistory).catch(() => setHistory([]));
+  }, []);
 
-app = FastAPI(title="DentalAge AI API", version="1.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
-DB_PATH = Path(settings.database_url.replace("sqlite:///", "", 1)) if settings.database_url.startswith("sqlite:///") else Path(settings.database_url)
-initialize_db(DB_PATH)
-
-UPLOAD_DIR = Path(settings.upload_dir)
-RESULT_DIR = Path(settings.result_dir)
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-RESULT_DIR.mkdir(parents=True, exist_ok=True)
-
-MODEL_PATH = Path(settings.model_path)
-MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-ensure_model_exists(MODEL_PATH)
-
-
-def create_heatmap_file(source_path: Path, heatmap_array) -> Path:
-    import numpy as np
-    from PIL import Image
-
-    heatmap = np.asarray(heatmap_array, dtype=np.float32)
-    if heatmap.size == 0:
-        raise ValueError("Generated heatmap is empty.")
-
-    heatmap = np.clip((heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8), 0.0, 1.0)
-    color = np.zeros((heatmap.shape[0], heatmap.shape[1], 3), dtype=np.uint8)
-    color[:, :, 0] = np.clip(heatmap * 255, 0, 255)
-    color[:, :, 1] = np.clip((1 - heatmap) * 255, 0, 255)
-    color[:, :, 2] = np.clip((1 - heatmap) * 80, 0, 255)
-
-    target = RESULT_DIR / f"heatmap_{source_path.stem}_{uuid.uuid4().hex[:8]}.png"
-    Image.fromarray(color, mode="RGB").save(target)
-    return target
-
-
-@app.get("/api/v1/health")
-def health_check():
-    return {
-        "status": "ok",
-        "app": settings.app_name,
-        "model_available": MODEL_PATH.exists(),
-        "database": str(DB_PATH),
+  const handleFileSelected = (file: File) => {
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setError('Please upload a JPG, JPEG, or PNG dental X-ray.');
+      return;
     }
+    setSelectedFile(file);
+    setPreviewUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return URL.createObjectURL(file);
+    });
+    setResult(null);
+    setError('');
+  };
 
-
-@app.post("/api/v1/predict")
-async def predict(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file was uploaded.")
-    if not is_supported_image_extension(file.filename):
-        raise HTTPException(status_code=400, detail="Please upload a JPG, JPEG, or PNG dental X-ray.")
-
-    file.file.seek(0, 2)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    if file_size and file_size > settings.max_upload_size:
-        raise HTTPException(status_code=413, detail="The uploaded file is too large.")
-
-    stored_path, generated_name = save_upload(file, UPLOAD_DIR)
-    source_path = Path(stored_path)
-
-    if not is_valid_image(source_path):
-        raise HTTPException(status_code=400, detail="The uploaded file could not be processed as an image.")
-
-    try:
-        predictor = DentalAgePredictor(MODEL_PATH)
-        age = predictor.predict(source_path)
-        heatmap = predictor.gradcam_heatmap(source_path)
-        heatmap_path = create_heatmap_file(source_path, heatmap)
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="The AI model is currently unavailable.") from exc
-
-    analysis_id = str(uuid.uuid4())
-    created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    record = {
-        "id": analysis_id,
-        "original_filename": file.filename,
-        "generated_filename": generated_name,
-        "predicted_age": round(float(age), 2),
-        "uncertainty": None,
-        "model_version": "1.0.0-dev",
-        "result_path": str(source_path),
-        "heatmap_path": str(heatmap_path),
-        "created_at": created_at,
-        "status": "completed",
-        "notes": "AI-estimated dental age for research and educational use only.",
+  const handleAnalyze = async () => {
+    if (!selectedFile) {
+      setError('Please upload a dental X-ray before analyzing.');
+      return;
     }
-    record_analysis(DB_PATH, record)
-
-    response = {
-        "id": analysis_id,
-        "predicted_age": round(float(age), 2),
-        "uncertainty": None,
-        "model_version": "1.0.0-dev",
-        "explanation_available": True,
-        "heatmap_url": f"/results/{heatmap_path.name}",
-        "created_at": created_at,
-        "status": "completed",
+    setLoading(true);
+    setError('');
+    try {
+      const prediction = await analyzeImage(selectedFile);
+      setResult({
+        ...prediction,
+        heatmap_url: prediction.heatmap_url
+          ? `${API_BASE}${prediction.heatmap_url}`
+          : null,
+      });
+      setHistory((previous) => [
+        {
+          id: prediction.id,
+          predicted_age: prediction.predicted_age,
+          uncertainty: prediction.uncertainty,
+          model_version: prediction.model_version,
+          created_at: prediction.created_at,
+          status: prediction.status || 'completed',
+          original_filename: selectedFile.name,
+        },
+        ...previous,
+      ]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Something went wrong while analyzing the image.');
+    } finally {
+      setLoading(false);
     }
-    return response
+  };
 
+  return (
+    <div className="app-shell">
+      <Navbar />
+      <main>
+        <section className="hero">
+          <div className="hero-panel">
+            <div className="hero-kicker">Research prototype</div>
+            <h1>Explainable panoramic X-ray age estimation.</h1>
+            <p>Upload a dental radiograph, run the regression pipeline, and inspect the image regions that influenced the estimate.</p>
+            <button className="primary-button" onClick={() => document.getElementById('analyze')?.scrollIntoView({ behavior: 'smooth' })}>
+              Analyze an X-ray
+            </button>
+          </div>
+          <div className="preview-card hero-visual">
+            <div className="scan-lines" aria-hidden="true" />
+            <span>DentalAge AI</span>
+            <small>Explainable image analysis</small>
+          </div>
+        </section>
 
-@app.get("/api/v1/history")
-def list_analysis_history():
-    return list_history(DB_PATH)
+        <section className="section-grid">
+          <div className="panel info-card"><h3>01 · Upload</h3><p>Provide a readable JPG, JPEG, or PNG panoramic radiograph.</p></div>
+          <div className="panel info-card"><h3>02 · Estimate</h3><p>A PyTorch regression model returns a continuous age estimate.</p></div>
+          <div className="panel info-card"><h3>03 · Explain</h3><p>Grad-CAM highlights visual regions used by the model.</p></div>
+        </section>
 
+        <section id="analyze" className="analyze-layout">
+          <div>
+            <UploadBox onFileSelected={handleFileSelected} />
+            {selectedFile && <p className="file-name">Selected: {selectedFile.name}</p>}
+            {error && <div className="panel error-message" role="alert">{error}</div>}
+            <button className="primary-button analyze-button" onClick={handleAnalyze} disabled={loading || !selectedFile}>
+              {loading ? 'Analyzing…' : 'Analyze image'}
+            </button>
+            {loading && <div className="panel loading-message">Validating image · preprocessing · running model · generating explanation</div>}
+          </div>
+          <XrayPreview src={previewUrl} />
+        </section>
 
-@app.get("/api/v1/history/{analysis_id}")
-def get_history_item(analysis_id: str):
-    item = get_analysis_by_id(DB_PATH, analysis_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Analysis not found.")
-    return item
+        <section className="results-grid">
+          <PredictionCard result={result} />
+          <HeatmapViewer src={result?.heatmap_url || undefined} />
+        </section>
 
+        <section className="panel explainability-panel">
+          <h2>How to interpret the heatmap</h2>
+          <p>Grad-CAM indicates image regions that influenced the model output. It is a visual-saliency aid, not proof of a medical or causal relationship.</p>
+        </section>
 
-@app.get("/api/v1/result/{analysis_id}")
-def get_result(analysis_id: str):
-    item = get_analysis_by_id(DB_PATH, analysis_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Analysis not found.")
-    source = Path(item["result_path"])
-    if source.exists():
-        return FileResponse(source)
-    raise HTTPException(status_code=404, detail="Result file not found.")
+        <section id="history" className="content-section">
+          <h2>Analysis history</h2>
+          <HistoryTable items={history} />
+        </section>
 
-
-@app.delete("/api/v1/history/{analysis_id}")
-def delete_history_item(analysis_id: str):
-    deleted = delete_analysis(DB_PATH, analysis_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Analysis not found.")
-    return {"status": "deleted", "id": analysis_id}
-
-
-@app.get("/results/{image_name}")
-def get_result_image(image_name: str):
-    safe_name = Path(image_name).name
-    file_path = RESULT_DIR / safe_name
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Heatmap not found.")
-    return FileResponse(file_path)
+        <section id="about" className="panel content-section">
+          <h2>Responsible use</h2>
+          <p>This application provides an AI-estimated dental age for research and educational purposes. It is not a definitive determination of chronological age and should not be used as the sole basis for medical, legal, forensic, or identity-related decisions.</p>
+        </section>
+      </main>
+    </div>
+  );
+}
